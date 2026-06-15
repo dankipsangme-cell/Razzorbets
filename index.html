@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Razorwin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (compat SDK, vanilla JS) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  :root {
+    --navy: #0F1B2D;
+    --navy-light: #16263D;
+    --navy-lighter: #1F3552;
+    --gold: #FFC845;
+    --pitch: #1B4332;
+    --cream: #F4EFE3;
+    --win: #2ECC71;
+    --loss: #E63946;
+    --text: #F4EFE3;
+    --text-dim: #7E8FA8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 90px;
+  }
+
+  .container { max-width: 480px; margin: 0 auto; }
+
+  /* ---------- Auth ---------- */
+  .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .auth-card { background: var(--navy-light); border: 1px solid var(--navy-lighter); border-radius: 12px; padding: 32px 24px; width: 100%; max-width: 380px; }
+  .auth-card h1 { font-family: 'Anton', sans-serif; font-size: 2.2rem; color: var(--gold); text-align: center; letter-spacing: 0.08em; }
+  .auth-tagline { text-align: center; color: var(--text-dim); font-size: 0.8rem; margin: 4px 0 24px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; }
+  .input-group { margin-bottom: 14px; }
+  .input-group label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 4px; }
+  .input-group input { width: 100%; padding: 10px 12px; background: var(--navy); border: 1px solid var(--navy-lighter); border-radius: 6px; color: var(--text); font-size: 0.95rem; }
+  .input-group input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .btn-primary { width: 100%; padding: 12px; background: var(--gold); color: var(--navy); border: none; border-radius: 6px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 6px; }
+  .btn-primary:focus-visible { outline: 2px solid var(--text); }
+  .auth-switch { text-align: center; margin-top: 16px; font-size: 0.85rem; color: var(--text-dim); }
+  .auth-switch a { color: var(--gold); cursor: pointer; text-decoration: underline; }
+
+  /* ---------- App shell ---------- */
+  header { position: sticky; top: 0; z-index: 50; background: var(--navy-light); display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 2px solid var(--gold); }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 480px; margin: 0 auto; }
+  .logo { font-family: 'Anton', sans-serif; font-size: 1.4rem; color: var(--gold); letter-spacing: 0.08em; }
+  .balance-pill { font-family: 'JetBrains Mono', monospace; background: var(--gold); color: var(--navy); padding: 6px 12px; border-radius: 4px; font-weight: 700; font-size: 0.9rem; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .logout-btn { background: none; border: 1px solid var(--navy-lighter); color: var(--text-dim); padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+  .logout-btn:focus-visible { outline: 2px solid var(--gold); }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--navy-lighter); max-width: 480px; margin: 0 auto; }
+  .tab { flex: 1; text-align: center; padding: 12px; font-weight: 600; font-size: 0.9rem; color: var(--text-dim); cursor: pointer; }
+  .tab.active { color: var(--gold); border-bottom: 2px solid var(--gold); }
+  .tab:focus-visible { outline: 2px solid var(--gold); }
+
+  .empty-msg { padding: 40px 20px; text-align: center; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; line-height: 1.5; }
+
+  /* ---------- Fixtures ---------- */
+  .fixture-card { background: var(--navy-light); border: 1px solid var(--navy-lighter); border-radius: 8px; padding: 14px; margin: 12px 16px; }
+  .fixture-meta { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; }
+  .fixture-teams { font-weight: 700; font-size: 1rem; margin-bottom: 10px; }
+  .odds-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .odds-btn { background: var(--navy); border: 1px solid var(--navy-lighter); border-radius: 6px; padding: 8px 4px; text-align: center; cursor: pointer; transition: background .15s, border-color .15s; }
+  .odds-btn:focus-visible { outline: 2px solid var(--gold); }
+  .odds-btn .odds-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .odds-btn .odds-value { font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: var(--gold); font-weight: 700; text-shadow: 0 0 8px rgba(255,200,69,0.35); }
+  .odds-btn.selected { background: var(--gold); border-color: var(--gold); }
+  .odds-btn.selected .odds-label, .odds-btn.selected .odds-value { color: var(--navy); text-shadow: none; }
+
+  /* ---------- My Bets (ticket stub) ---------- */
+  .bet-stub { background: var(--cream); color: var(--navy); border-radius: 10px; margin: 12px 16px; overflow: hidden; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+  .bet-stub-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(15,27,45,0.06); }
+  .bet-stub-body { padding: 10px 14px 14px; }
+  .stub-row { display: flex; justify-content: space-between; padding: 3px 0; gap: 12px; }
+  .stub-row span:first-child { flex: 1; }
+  .stub-divider { border-top: 1px dashed rgba(15,27,45,0.25); margin-top: 6px; padding-top: 6px; }
+  .status-stamp { display: inline-block; border: 2px solid; border-radius: 4px; padding: 2px 10px; font-family: 'Anton', sans-serif; letter-spacing: 0.1em; font-size: 0.75rem; transform: rotate(-4deg); }
+  .status-stamp.pending { color: var(--gold); border-color: var(--gold); }
+  .status-stamp.won { color: var(--win); border-color: var(--win); }
+  .status-stamp.lost { color: var(--loss); border-color: var(--loss); }
+
+  /* ---------- Wallet ---------- */
+  .wallet-balance { text-align: center; padding: 32px 16px; }
+  .wallet-balance .wallet-label { color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; letter-spacing: 0.15em; }
+  .wallet-balance .wallet-amount { font-family: 'Anton', sans-serif; font-size: 2.8rem; color: var(--gold); letter-spacing: 0.04em; }
+  .wallet-actions { display: flex; flex-direction: column; gap: 14px; padding: 0 16px 24px; }
+  .wallet-card { background: var(--navy-light); border: 1px solid var(--navy-lighter); border-radius: 10px; padding: 16px; }
+  .wallet-card h3 { font-family: 'Anton', sans-serif; font-size: 1rem; color: var(--gold); margin-bottom: 8px; letter-spacing: 0.05em; }
+  .wallet-note { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 10px; line-height: 1.5; }
+  .wallet-note strong { color: var(--text); }
+  .wallet-card input { width: 100%; padding: 9px 10px; margin-bottom: 8px; background: var(--navy); border: 1px solid var(--navy-lighter); border-radius: 6px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
+  .wallet-card input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .wallet-card button { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
+  .wallet-card button:focus-visible { outline: 2px solid var(--text); }
+  .deposit-btn { background: var(--win); color: var(--navy); }
+  .withdraw-btn { background: var(--gold); color: var(--navy); }
+
+  /* ---------- Bet slip (perforated ticket) ---------- */
+  .betslip-tab { position: fixed; bottom: 0; left: 0; right: 0; z-index: 60; background: var(--cream); color: var(--navy); border-radius: 12px 12px 0 0; box-shadow: 0 -4px 16px rgba(0,0,0,0.35); max-height: 56px; overflow: hidden; transition: max-height .3s ease; }
+  .betslip-tab.open { max-height: 78vh; overflow-y: auto; }
+  .betslip-handle { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; cursor: pointer; font-family: 'Anton', sans-serif; letter-spacing: 0.06em; background: var(--gold); border-radius: 12px 12px 0 0; font-size: 0.95rem; }
+  .betslip-handle:focus-visible { outline: 2px solid var(--navy); }
+  .perforation { height: 14px; background-color: var(--cream); background-image: radial-gradient(circle, var(--navy) 0 6px, transparent 6.5px); background-size: 24px 14px; background-position: center; background-repeat: repeat-x; }
+  .betslip-body { padding: 12px 20px 24px; max-width: 480px; margin: 0 auto; }
+  .selection-row { display: flex; justify-content: space-between; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; padding: 6px 0; border-bottom: 1px dashed rgba(15,27,45,0.2); }
+  .selection-row .sel-name { flex: 1; }
+  .betslip-totals { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; }
+  .stake-input { width: 100%; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; border: 2px solid var(--navy); border-radius: 6px; margin: 10px 0; background: var(--cream); color: var(--navy); }
+  .stake-input:focus { outline: 2px solid var(--pitch); }
+  .place-bet-btn { width: 100%; padding: 14px; background: var(--navy); color: var(--gold); font-family: 'Anton', sans-serif; letter-spacing: 0.08em; font-size: 1.05rem; border: none; border-radius: 6px; cursor: pointer; }
+  .place-bet-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .barcode { height: 26px; margin-top: 14px; background: repeating-linear-gradient(90deg, var(--navy) 0 2px, transparent 2px 5px, var(--navy) 5px 6px, transparent 6px 9px); opacity: 0.7; }
+  .slip-code { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; text-align: center; color: rgba(15,27,45,0.5); margin-top: 4px; letter-spacing: 0.1em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .betslip-tab { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============ AUTH SCREEN ============ -->
+  <div id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <h1>RAZORWIN</h1>
+      <div class="auth-tagline">// PLACE YOUR BET //</div>
+
+      <form id="loginForm">
+        <div class="input-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" autocomplete="email">
+        </div>
+        <div class="input-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" autocomplete="current-password">
+        </div>
+        <button type="button" id="loginBtn" class="btn-primary">Log In</button>
+      </form>
+
+      <form id="registerForm" style="display:none">
+        <div class="input-group">
+          <label for="regEmail">Email</label>
+          <input type="email" id="regEmail" autocomplete="email">
+        </div>
+        <div class="input-group">
+          <label for="regPhone">M-PESA Phone Number</label>
+          <input type="tel" id="regPhone" placeholder="07XXXXXXXX" autocomplete="tel">
+        </div>
+        <div class="input-group">
+          <label for="regPassword">Password (min 6 characters)</label>
+          <input type="password" id="regPassword" autocomplete="new-password">
+        </div>
+        <button type="button" id="registerBtn" class="btn-primary">Create Account</button>
+      </form>
+
+      <div class="auth-switch" id="loginSwitch">New to Razorwin? <a id="showRegister">Create an account</a></div>
+      <div class="auth-switch" id="registerSwitch" style="display:none">Already have an account? <a id="showLogin">Log in</a></div>
+    </div>
+  </div>
+
+  <!-- ============ APP SHELL ============ -->
+  <div id="appShell" style="display:none">
+    <header>
+      <div class="header-inner">
+        <div class="logo">RAZORWIN</div>
+        <div class="header-right">
+          <div class="balance-pill" id="balancePill">KES 0</div>
+          <button class="logout-btn" id="logoutBtn">Log Out</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <div class="tab active" data-view="fixturesView">Fixtures</div>
+      <div class="tab" data-view="myBetsView">My Bets</div>
+      <div class="tab" data-view="walletView">Wallet</div>
+    </div>
+
+    <div class="container">
+      <div id="fixturesView" class="view">
+        <div id="fixturesList"></div>
+      </div>
+
+      <div id="myBetsView" class="view" style="display:none">
+        <div id="myBetsList"></div>
+      </div>
+
+      <div id="walletView" class="view" style="display:none">
+        <div class="wallet-balance">
+          <div class="wallet-label">YOUR BALANCE</div>
+          <div class="wallet-amount" id="walletBalance">KES 0</div>
+        </div>
+        <div class="wallet-actions">
+          <div class="wallet-card">
+            <h3>Deposit</h3>
+            <p class="wallet-note">Pay via M-PESA Till Number <strong>3467367</strong>, then enter your confirmation code and the amount below. Your balance updates once the deposit is verified.</p>
+            <input type="text" id="depositCode" placeholder="M-PESA Confirmation Code">
+            <input type="number" id="depositAmount" placeholder="Amount Paid (KES)" min="1">
+            <button class="deposit-btn" id="depositBtn">Submit Deposit</button>
+          </div>
+          <div class="wallet-card">
+            <h3>Withdraw</h3>
+            <p class="wallet-note">Withdrawals are sent to your M-PESA number and processed by the Razorwin team.</p>
+            <input type="tel" id="withdrawPhone" placeholder="M-PESA Number" autocomplete="tel">
+            <input type="number" id="withdrawAmount" placeholder="Amount (KES)" min="1">
+            <button class="withdraw-btn" id="withdrawBtn">Withdraw to M-PESA</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BET SLIP (perforated ticket) ============ -->
+  <div id="betSlipTab" class="betslip-tab" style="display:none">
+    <div class="betslip-handle" id="betSlipHandle">
+      <span>BET SLIP (<span id="slipCount">0</span>)</span>
+      <span id="slipArrow">&#9650;</span>
+    </div>
+    <div class="perforation"></div>
+    <div class="betslip-body">
+      <div id="slipSelections"></div>
+      <div class="betslip-totals">
+        <div class="selection-row" style="border-bottom:none;"><span>Combined Odds</span><span id="combinedOdds">0.00</span></div>
+      </div>
+      <input type="number" id="stakeInput" class="stake-input" placeholder="Stake (KES)" min="1">
+      <div class="betslip-totals">
+        <div class="selection-row" style="border-bottom:none;"><span>Potential Win</span><span id="potentialWin">KES 0.00</span></div>
+      </div>
+      <button id="placeBetBtn" class="place-bet-btn">PLACE BET</button>
+      <div class="barcode"></div>
+      <div class="slip-code">RAZORWIN &middot; KENYA &middot; VOID IF ALTERED</div>
+    </div>
+  </div>
+
+<script>
+  // ===================================================================
+  // FIREBASE CONFIG — Razorwin project
+  // ===================================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCyh0lgw_B3gpYI-xsp2AqxKWvF7m3Xwms",
+    authDomain: "razor-7a518.firebaseapp.com",
+    databaseURL: "https://razor-7a518-default-rtdb.firebaseio.com",
+    projectId: "razor-7a518",
+    storageBucket: "razor-7a518.firebasestorage.app",
+    messagingSenderId: "644076556714",
+    appId: "1:644076556714:web:85593df71d84962045dbd3"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // NOTE on "email already in use":
+  // Firebase Authentication is shared across an ENTIRE project, not per-database.
+  // If this project's Authentication has previously been used by another app
+  // (e.g. one that stores its data in the Realtime Database instead of Firestore),
+  // an email registered there will already exist here too, even though Razorwin's
+  // own Firestore "users" collection has no profile document for that account yet.
+  // The fixes below make sign-up/login resilient to that situation by:
+  //   1) Auto-creating a missing Firestore profile doc on login.
+  //   2) Handling auth/email-already-in-use gracefully during registration.
+
+  // ===================================================================
+  // DATA MODEL (Firestore collections)
+  //
+  // users (doc ID = uid)     { email, phone, balance, createdAt }
+  // fixtures (auto ID)       { league, home, away, kickoff,
+  //                            oddsHome, oddsDraw, oddsAway, status }
+  //                          status: "upcoming" | "live" | "finished"
+  //                          For now, add fixtures directly in the
+  //                          Firestore console under the `fixtures` collection.
+  // bets (auto ID)           { uid, code, selections[], stake,
+  //                            combinedOdds, potentialWin, status, placedAt }
+  //                          status: "pending" | "won" | "lost"
+  // depositRequests (auto)   { uid, code, amount, status, submittedAt }
+  // usedMpesaCodes (doc ID = code) { uid, amount, submittedAt }
+  // withdrawalRequests (auto){ uid, phone, amount, status, requestedAt }
+  // ===================================================================
+
+  let currentUser = null;
+  let betSlip = []; // [{ fixtureId, selection, odds, home, away, league }]
+
+  // ---------- Auth screen toggling ----------
+  document.getElementById('showRegister').onclick = () => toggleAuthForm('register');
+  document.getElementById('showLogin').onclick = () => toggleAuthForm('login');
+
+  function toggleAuthForm(mode) {
+    document.getElementById('loginForm').style.display = mode === 'login' ? 'block' : 'none';
+    document.getElementById('registerForm').style.display = mode === 'register' ? 'block' : 'none';
+    document.getElementById('loginSwitch').style.display = mode === 'login' ? 'block' : 'none';
+    document.getElementById('registerSwitch').style.display = mode === 'register' ? 'block' : 'none';
+  }
+
+  // ---------- Auth actions ----------
+  document.getElementById('loginBtn').onclick = async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password) { alert('Enter your email and password.'); return; }
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  document.getElementById('registerBtn').onclick = async () => {
+    const email = document.getElementById('regEmail').value.trim();
+    const phone = document.getElementById('regPhone').value.trim();
+    const password = document.getElementById('regPassword').value;
+    if (!email || !phone || !password) { alert('Fill in all fields to create your account.'); return; }
+    if (password.length < 6) { alert('Password must be at least 6 characters.'); return; }
+    try {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      await db.collection('users').doc(cred.user.uid).set({
+        email, phone, balance: 0, createdAt: Date.now()
+      });
+    } catch (e) {
+      if (e.code === 'auth/email-already-in-use') {
+        // This email already has an Authentication account on this Firebase
+        // project (possibly created by a different app). Send the user to
+        // the login form instead of failing silently.
+        alert('An account with this email already exists. Please log in instead — if it\'s yours, your Razorwin profile will be set up automatically.');
+        toggleAuthForm('login');
+        document.getElementById('loginEmail').value = email;
+      } else {
+        alert(e.message);
+      }
+    }
+  };
+
+  document.getElementById('logoutBtn').onclick = () => auth.signOut();
+
+  auth.onAuthStateChanged(async user => {
+    currentUser = user;
+    if (user) {
+      // Ensure a Firestore profile exists for this user. Covers accounts whose
+      // Authentication record was created by a different app on this same
+      // Firebase project (see note above firebaseConfig).
+      try {
+        const userRef = db.collection('users').doc(user.uid);
+        const snap = await userRef.get();
+        if (!snap.exists) {
+          await userRef.set({ email: user.email || '', phone: '', balance: 0, createdAt: Date.now() });
+        }
+      } catch (e) {
+        console.error('Could not verify/create user profile:', e);
+      }
+
+      document.getElementById('authScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      listenToBalance();
+      listenToFixtures();
+      listenToMyBets();
+    } else {
+      document.getElementById('authScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+      document.getElementById('betSlipTab').style.display = 'none';
+      betSlip = [];
+    }
+  });
+
+  // ---------- Tab navigation ----------
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+      document.getElementById(tab.dataset.view).style.display = 'block';
+    };
+  });
+
+  // ---------- Balance ----------
+  function listenToBalance() {
+    db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
+      const bal = (doc.data() && doc.data().balance) || 0;
+      const formatted = 'KES ' + Number(bal).toLocaleString();
+      document.getElementById('balancePill').textContent = formatted;
+      document.getElementById('walletBalance').textContent = formatted;
+    });
+  }
+
+  // ---------- Fixtures ----------
+  function listenToFixtures() {
+    db.collection('fixtures').onSnapshot(snapshot => {
+      const fixtures = {};
+      snapshot.forEach(doc => { fixtures[doc.id] = doc.data(); });
+
+      const container = document.getElementById('fixturesList');
+      container.innerHTML = '';
+
+      const entries = Object.entries(fixtures).filter(([, f]) => f.status !== 'finished');
+      if (entries.length === 0) {
+        container.innerHTML = '<p class="empty-msg">No fixtures available right now.<br>Check back closer to kickoff.</p>';
+        return;
+      }
+
+      entries.forEach(([id, f]) => {
+        const card = document.createElement('div');
+        card.className = 'fixture-card';
+        card.innerHTML = `
+          <div class="fixture-meta">${escapeHtml(f.league || 'Match')} &middot; ${escapeHtml(f.kickoff || '')}${f.status === 'live' ? ' &middot; LIVE' : ''}</div>
+          <div class="fixture-teams">${escapeHtml(f.home)} vs ${escapeHtml(f.away)}</div>
+          <div class="odds-row">
+            <button class="odds-btn" data-id="${id}" data-sel="home" data-odds="${f.oddsHome}">
+              <div class="odds-label">${escapeHtml(f.home)}</div>
+              <div class="odds-value">${Number(f.oddsHome).toFixed(2)}</div>
+            </button>
+            <button class="odds-btn" data-id="${id}" data-sel="draw" data-odds="${f.oddsDraw}">
+              <div class="odds-label">Draw</div>
+              <div class="odds-value">${Number(f.oddsDraw).toFixed(2)}</div>
+            </button>
+            <button class="odds-btn" data-id="${id}" data-sel="away" data-odds="${f.oddsAway}">
+              <div class="odds-label">${escapeHtml(f.away)}</div>
+              <div class="odds-value">${Number(f.oddsAway).toFixed(2)}</div>
+            </button>
+          </div>`;
+        container.appendChild(card);
+      });
+
+      container.querySelectorAll('.odds-btn').forEach(btn => {
+        btn.onclick = () => toggleSelection(btn, fixtures);
+      });
+
+      refreshOddsButtonStates();
+    });
+  }
+
+  function toggleSelection(btn, fixtures) {
+    const id = btn.dataset.id;
+    const sel = btn.dataset.sel;
+    const odds = parseFloat(btn.dataset.odds);
+    const f = fixtures[id];
+
+    const existingIndex = betSlip.findIndex(s => s.fixtureId === id);
+    if (existingIndex >= 0 && betSlip[existingIndex].selection === sel) {
+      betSlip.splice(existingIndex, 1); // tap again to remove
+    } else {
+      const entry = { fixtureId: id, selection: sel, odds, home: f.home, away: f.away, league: f.league || '' };
+      if (existingIndex >= 0) betSlip[existingIndex] = entry;
+      else betSlip.push(entry);
+    }
+    refreshOddsButtonStates();
+    renderBetSlip();
+  }
+
+  function refreshOddsButtonStates() {
+    document.querySelectorAll('.odds-btn').forEach(btn => {
+      const match = betSlip.find(s => s.fixtureId === btn.dataset.id && s.selection === btn.dataset.sel);
+      btn.classList.toggle('selected', !!match);
+    });
+  }
+
+  // ---------- Bet slip ----------
+  document.getElementById('betSlipHandle').onclick = () => {
+    document.getElementById('betSlipTab').classList.toggle('open');
+    const open = document.getElementById('betSlipTab').classList.contains('open');
+    document.getElementById('slipArrow').innerHTML = open ? '&#9660;' : '&#9650;';
+  };
+
+  document.getElementById('stakeInput').oninput = updatePotentialWin;
+
+  function renderBetSlip() {
+    const tab = document.getElementById('betSlipTab');
+    document.getElementById('slipCount').textContent = betSlip.length;
+    tab.style.display = betSlip.length > 0 ? 'block' : 'none';
+
+    const list = document.getElementById('slipSelections');
+    list.innerHTML = betSlip.map(s => {
+      const label = s.selection === 'home' ? s.home : s.selection === 'away' ? s.away : 'Draw';
+      const opponent = s.selection === 'home' ? s.away : s.selection === 'away' ? s.home : (s.home + ' / ' + s.away);
+      return `<div class="selection-row">
+                <span class="sel-name">${escapeHtml(label)} <span style="opacity:.55">vs ${escapeHtml(opponent)}</span></span>
+                <span>${s.odds.toFixed(2)}</span>
+              </div>`;
+    }).join('');
+
+    document.getElementById('combinedOdds').textContent = combinedOdds().toFixed(2);
+    updatePotentialWin();
+  }
+
+  function combinedOdds() {
+    return betSlip.reduce((acc, s) => acc * s.odds, 1);
+  }
+
+  function updatePotentialWin() {
+    const stake = parseFloat(document.getElementById('stakeInput').value) || 0;
+    document.getElementById('potentialWin').textContent = 'KES ' + (stake * combinedOdds()).toFixed(2);
+  }
+
+  // ---------- Balance transactions ----------
+  // Atomically deducts `amount` from the current user's balance.
+  // Returns true if it succeeded, false if balance was insufficient.
+  async function deductBalance(amount) {
+    const userRef = db.collection('users').doc(currentUser.uid);
+    try {
+      await db.runTransaction(async (tx) => {
+        const userDoc = await tx.get(userRef);
+        const bal = (userDoc.data() && userDoc.data().balance) || 0;
+        if (bal < amount) throw new Error('insufficient-balance');
+        tx.set(userRef, { balance: bal - amount }, { merge: true });
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  document.getElementById('placeBetBtn').onclick = async () => {
+    const stake = parseFloat(document.getElementById('stakeInput').value);
+    if (!betSlip.length) { alert('Add at least one selection to your bet slip.'); return; }
+    if (!stake || stake <= 0) { alert('Enter a stake amount.'); return; }
+
+    if (!(await deductBalance(stake))) {
+      alert('Insufficient balance. Top up your wallet first.');
+      return;
+    }
+
+    const combined = combinedOdds();
+    const code = 'RW' + Math.random().toString(36).slice(2, 8).toUpperCase();
+
+    await db.collection('bets').add({
+      uid: currentUser.uid,
+      code,
+      selections: betSlip,
+      stake,
+      combinedOdds: combined,
+      potentialWin: Number((stake * combined).toFixed(2)),
+      status: 'pending',
+      placedAt: Date.now()
+    });
+
+    betSlip = [];
+    document.getElementById('stakeInput').value = '';
+    refreshOddsButtonStates();
+    renderBetSlip();
+    document.getElementById('betSlipTab').classList.remove('open');
+    document.getElementById('slipArrow').innerHTML = '&#9650;';
+    alert('Bet placed! Slip code: ' + code);
+  };
+
+  // ---------- My Bets ----------
+  function listenToMyBets() {
+    db.collection('bets')
+      .where('uid', '==', currentUser.uid)
+      .orderBy('placedAt', 'desc')
+      .onSnapshot(snapshot => {
+        const mine = [];
+        snapshot.forEach(doc => mine.push(doc.data()));
+
+        const container = document.getElementById('myBetsList');
+        container.innerHTML = '';
+
+        if (!mine.length) {
+          container.innerHTML = '<p class="empty-msg">No bets placed yet.<br>Head to Fixtures to get started.</p>';
+          return;
+        }
+
+        mine.forEach(b => {
+          const stub = document.createElement('div');
+          stub.className = 'bet-stub';
+
+          const selRows = b.selections.map(s => {
+            const label = s.selection === 'home' ? s.home : s.selection === 'away' ? s.away : 'Draw';
+            return `<div class="stub-row"><span>${escapeHtml(label)}</span><span>${s.odds.toFixed(2)}</span></div>`;
+          }).join('');
+
+          stub.innerHTML = `
+            <div class="bet-stub-header">
+              <span>#${escapeHtml(b.code)}</span>
+              <span class="status-stamp ${b.status}">${b.status.toUpperCase()}</span>
+            </div>
+            <div class="bet-stub-body">
+              ${selRows}
+              <div class="stub-row stub-divider"><span>Stake</span><span>KES ${Number(b.stake).toFixed(2)}</span></div>
+              <div class="stub-row"><span>Combined odds</span><span>${Number(b.combinedOdds).toFixed(2)}</span></div>
+              <div class="stub-row"><span>Potential win</span><span>KES ${Number(b.potentialWin).toFixed(2)}</span></div>
+            </div>`;
+          container.appendChild(stub);
+        });
+      });
+  }
+
+  // ---------- Wallet: deposit (M-PESA confirmation code) ----------
+  document.getElementById('depositBtn').onclick = async () => {
+    const code = document.getElementById('depositCode').value.trim().toUpperCase();
+    const amount = parseFloat(document.getElementById('depositAmount').value);
+    if (!code || !amount || amount <= 0) {
+      alert('Enter your M-PESA confirmation code and the amount paid.');
+      return;
+    }
+
+    const codeRef = db.collection('usedMpesaCodes').doc(code);
+    const snap = await codeRef.get();
+    if (snap.exists) {
+      alert('This M-PESA code has already been submitted.');
+      return;
+    }
+
+    await codeRef.set({ uid: currentUser.uid, amount, submittedAt: Date.now() });
+    await db.collection('depositRequests').add({
+      uid: currentUser.uid, code, amount, status: 'pending', submittedAt: Date.now()
+    });
+
+    alert('Deposit submitted for review. Your balance will update once verified.');
+    document.getElementById('depositCode').value = '';
+    document.getElementById('depositAmount').value = '';
+  };
+
+  // ---------- Wallet: withdraw ----------
+  document.getElementById('withdrawBtn').onclick = async () => {
+    const phone = document.getElementById('withdrawPhone').value.trim();
+    const amount = parseFloat(document.getElementById('withdrawAmount').value);
+    if (!phone || !amount || amount <= 0) {
+      alert('Enter your M-PESA number and the amount to withdraw.');
+      return;
+    }
+
+    if (!(await deductBalance(amount))) {
+      alert('Insufficient balance for this withdrawal.');
+      return;
+    }
+
+    await db.collection('withdrawalRequests').add({
+      uid: currentUser.uid, phone, amount, status: 'pending', requestedAt: Date.now()
+    });
+
+    alert('Withdrawal request submitted. KES ' + amount + ' will be sent to ' + phone + ' once processed.');
+    document.getElementById('withdrawAmount').value = '';
+  };
+
+  // ---------- Utility ----------
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+</script>
+</body>
+</html>
